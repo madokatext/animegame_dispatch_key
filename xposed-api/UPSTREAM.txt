@@ -1,0 +1,10 @@
+libxposed API 100
+Source repository https://github.com/libxposed/api
+Commit 88cc0781e1138477c6b2a6570a0a27692f91f175
+
+This is the last API 100 source revision before the API 101 redesign.
+Java source files are copied unchanged from api/src/main/java at that commit.
+The local Android library build configuration uses this project's SDK and
+Gradle versions. The app uses this library as a compileOnly dependency.
+
+The upstream Apache License 2.0 is included in LICENSE.
