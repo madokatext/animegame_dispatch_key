@@ -25,6 +25,9 @@ import io.github.libxposed.api.XposedInterface.BeforeHookCallback;
 import io.github.libxposed.api.XposedInterface.Hooker;
 import io.github.libxposed.api.XposedInterface.MethodUnhooker;
 import io.github.libxposed.api.XposedModule;
+import io.github.libxposed.api.annotations.AfterInvocation;
+import io.github.libxposed.api.annotations.BeforeInvocation;
+import io.github.libxposed.api.annotations.XposedHooker;
 
 public final class DispatchHook extends XposedModule {
     private static final String TARGET = "com.miHoYo.ys.bilibili";
@@ -43,6 +46,8 @@ public final class DispatchHook extends XposedModule {
     public DispatchHook(XposedInterface base, ModuleLoadedParam param) {
         super(base, param);
         module = this;
+        log("Dispatch Observer module loaded, process=" + param.getProcessName()
+                + ", pid=" + Process.myPid());
     }
 
     @Override
@@ -54,6 +59,7 @@ public final class DispatchHook extends XposedModule {
         // The framework context belongs to the module. Use the target package's data directory.
         captureDirectory = new File(param.getApplicationInfo().dataDir, "files/dispatch-observer");
         List<MethodUnhooker<?>> installed = new ArrayList<>();
+        String stage = "resolve UnityWebRequest methods";
         try {
             Class<?> request = Class.forName(
                     "com.unity3d.player.UnityWebRequest", false, param.getClassLoader());
@@ -63,9 +69,13 @@ public final class DispatchHook extends XposedModule {
             Method status = request.getDeclaredMethod("responseCodeCallback", int.class);
             Method run = request.getDeclaredMethod("run");
 
+            stage = "hook UnityWebRequest constructor";
             installed.add(hook(constructor, RequestHooker.class));
+            stage = "hook downloadCallback";
             installed.add(hook(download, DownloadHooker.class));
+            stage = "hook responseCodeCallback";
             installed.add(hook(status, StatusHooker.class));
+            stage = "hook run";
             installed.add(hook(run, CompletionHooker.class));
             hooksInstalled = true;
             log("Dispatch Observer API 100 hooks installed, pid=" + Process.myPid());
@@ -77,11 +87,13 @@ public final class DispatchHook extends XposedModule {
                     report(unhookError);
                 }
             }
-            report(error);
+            log("Dispatch Observer hook installation failed at " + stage, error);
         }
     }
 
+    @XposedHooker
     public static final class RequestHooker implements Hooker {
+        @AfterInvocation
         public static void after(AfterHookCallback callback) {
             if (callback.getThrowable() == null) {
                 module.captureRequest(callback.getThisObject(), callback.getArgs());
@@ -89,19 +101,25 @@ public final class DispatchHook extends XposedModule {
         }
     }
 
+    @XposedHooker
     public static final class DownloadHooker implements Hooker {
+        @BeforeInvocation
         public static void before(BeforeHookCallback callback) {
             module.captureChunk(callback.getThisObject(), callback.getArgs());
         }
     }
 
+    @XposedHooker
     public static final class StatusHooker implements Hooker {
+        @BeforeInvocation
         public static void before(BeforeHookCallback callback) {
             module.captureStatus(callback.getThisObject(), (int) callback.getArgs()[0]);
         }
     }
 
+    @XposedHooker
     public static final class CompletionHooker implements Hooker {
+        @AfterInvocation
         public static void after(AfterHookCallback callback) {
             module.finishCapture(callback.getThisObject(), callback.getThrowable() != null);
         }
@@ -118,6 +136,7 @@ public final class DispatchHook extends XposedModule {
                 if ("https".equalsIgnoreCase(uri.getScheme())
                         && ("/query_region_list".equals(path) || "/query_cur_region".equals(path))) {
                     captures.put(request, new Capture(uri));
+                    log("Dispatch Observer matched " + path.substring(1));
                     return;
                 }
             }
@@ -210,7 +229,7 @@ public final class DispatchHook extends XposedModule {
     }
 
     private void report(Throwable error) {
-        log("Dispatch Observer error " + error.getClass().getSimpleName());
+        log("Dispatch Observer error", error);
     }
 
     private static final class Capture {

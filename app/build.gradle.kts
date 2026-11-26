@@ -10,8 +10,8 @@ android {
         applicationId = "local.dispatch.observer"
         minSdk = 23
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2-api100"
+        versionCode = 3
+        versionName = "0.3-api100"
     }
 
     compileOptions {
